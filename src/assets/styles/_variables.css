@@ -1,0 +1,45 @@
+:root {
+  /* Colors */
+  /* /080c10-10181f-1f2f3d-3d5d79-79baf2-9cd2ff-cee9ff-e7f4ff-f3faff-f9fdff/ */
+  --bg-color-mute: #f9fdff;
+  --bg-color-soft: #f3faff;
+  --bg-color: #e7f4ff;
+
+  --shadow-color: #cee9ff;
+
+  --text-color-soft: #10181f;
+  --text-color: #080c10;
+
+  --input-border-color: #cee9ff;
+  --input-border-color-hover: #9cd2ff;
+  --input-border-color-focus: #79baf2;
+
+  --button-color: #3d5d79;
+  --button-color-disabled: #888;
+  --button-bg-color: #e7f4ff;
+  --button-bg-color-hover: #ddefff;
+  --button-bg-color-active: #cee9ff;
+  --button-bg-color-disabled: #eee;
+
+  --select-color: #10181f;
+  --select-bg-color: #f9fdff;
+  --select-border-color: #cee9ff;
+  --select-border-color-hover: #9cd2ff;
+  --select-border-color-focus: #79baf2;
+
+  /* Sizes */
+  --size-xs: 4px;
+  --size-sm: 8px;
+  --size-md: 12px;
+  --size-lg: 14px;
+  --size-xl: 18px;
+
+  --text-xs: 0.5rem;
+  --text-sm: 1rem;
+  --text-md: 1.5rem;
+  --text-lg: 2rem;
+  --text-xl: 2.5rem;
+
+  --shadow-xs: 0px 2px var(--size-xs) 0px var(--shadow-color);
+  --shadow-sm: 0px 2px var(--size-sm) 1px var(--shadow-color);
+}

@@ -1,0 +1,16 @@
+input, select {
+  font-weight: 600;
+  border: none;
+  outline: none;
+}
+
+select {
+  cursor: pointer;
+}
+
+button {
+  background: none;
+  border: none;
+  outline: none;
+  cursor: pointer;
+}
