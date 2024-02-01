@@ -7,6 +7,9 @@ import { Status } from '@/enums/Status';
 import InputField from '@/components/InputField.vue';
 import Button from '@/components/Button.vue';
 import Select from '@/components/Select.vue';
+import App from '@/App.vue';
+
+let file: string;
 
 const parametersStore = useParametersStore();
 const calculatingStore = useCalculatingStore();
@@ -65,9 +68,262 @@ class GCodeUtils {
   }
 }
 
+class Figure {
+  private stepX: number;
+  private stepY: number;
+  private pathToFile: string;
+  private layerType: number;
+
+  constructor() {
+    this.stepX = getParameter.value('widthX') * getParameter.value('layerHeight') / getParameter.value('widthZ');
+    this.stepY = getParameter.value('widthY') * getParameter.value('layerHeight') / getParameter.value('widthZ');
+    this.layerType = 0;
+  }
+
+  public checkHeader() {
+    if (1) {
+      this.addRoundBase();
+    }
+  }
+
+  public addRoundBase() {
+    const x = getParameter.value('widthX');
+    const y = getParameter.value('widthY');
+    const extruderSize = getParameter.value('extruderSize');
+
+
+    const pointList = [];
+
+    pointList.push(point.newCoord(-2 * extruderSize, -2 * extruderSize));
+    pointList.push(point.newCoord(-2 * extruderSize, y + 2 * extruderSize));
+    pointList.push(point.newCoord(x + 2 * extruderSize, y + 2 * extruderSize));
+    pointList.push(point.newCoord(x + 2 * extruderSize, -2 * extruderSize));
+    pointList.push(point.newCoord(-extruderSize, -2 * extruderSize));
+    pointList.push(point.newCoord(-extruderSize, y + extruderSize));
+    pointList.push(point.newCoord(x + extruderSize, y + extruderSize));
+    pointList.push(point.newCoord(x + extruderSize, -extruderSize));
+    pointList.push(point.newCoord(0, -extruderSize));
+
+    const baseGLine: string = this.addGLine(pointList);
+
+    file = baseGLine;
+  }
+
+  public makePyramid() {
+    const layersCount = getParameter.value('widthZ') / getParameter.value('layerHeight');
+    
+    for (let z = 0; z < layersCount; ++z) {
+      const layer = new Layer(z, this.stepX, this.stepY);
+
+      // switch(this.layerType) {
+      //   case 0:
+      //     layer
+      // }
+      layer.calculate(true);
+      layer.calculate(false);
+    }
+  }
+
+  public addGLine(pointList): string {
+    const z = 0;
+
+    let str;
+
+    pointList.forEach((pointItem) => {
+      pointItem.translate(
+        point.newCoord(-getParameter.value('widthX') / 2, -getParameter.value('widthY') / 2)
+      );
+    });
+
+    str += `G1 X${pointList[0].getX()} Y${pointList[0].getY()} Z${0.2} F${gCodeUtils.getMovementSpeed(z)} A${gCodeUtils.getAAxisValue()}\n`;
+
+    for (let i = 1; i < pointList.length; ++i) {
+      const aAvalueMed = Math.pow(pointList[i - 1].getX() - pointList[i].getX(), 2) + Math.pow(pointList[i - 1].getY() - pointList[i].getY(), 2);
+      const aValue = gCodeUtils.getAAxisValue() + Math.sqrt(aAvalueMed) * gCodeUtils.getMaterialCount();
+
+      str += `G1 X${pointList[i].getX()} Y${pointList[i].getY()} Z${0.2} F${gCodeUtils.getMovementSpeed(z)} A${aValue}\n`;
+
+      gCodeUtils.setAAxisValue(aValue);
+    }
+
+    return str;
+  }
+}
+
+class Point {
+  private x: number;
+  private y: number;
+
+  constructor(x: number, y: number) {
+    this.x = x;
+    this.y = y;
+  }
+
+  public newCoord(x: number, y: number) {
+    return new Point(x, y);
+  }
+
+  public translate(x: number, y: number) {
+    this.x += x;
+    this.y += y;
+  }
+
+  public getX() {
+    return this.x;
+  }
+
+  public getY() {
+    return this.y;
+  }
+}
+
+class Layer {
+  private x: number;
+  private y: number;
+  private widthX: number;
+  private widthY: number;
+  private counterX: number;
+  private counterY: number;
+  private borderX: number;
+  private borderY: number;
+  private cellSizeX: number;
+  private cellSizeY: number;
+  private rotated: boolean;
+  private reflected: boolean;
+  private layerNumber: number;
+
+  constructor(z: number, stepX: number, stepY: number) {
+    this.layerNumber = z;
+    this.x = z * stepX / 2;
+    this.y = z * stepY / 2;
+    this.widthX = getParameter.value('widthX') - z * stepX;
+    this.widthY = getParameter.value('widthY') - z * stepY;
+    this.cellSizeX = getParameter.value('defaultCellSize');
+    this.cellSizeY = getParameter.value('defaultCellSize');
+    this.counterX = this.widthX / this.cellSizeX;
+    this.counterY = this.widthY / this.cellSizeY;
+    this.borderX = (this.widthX - this.counterX * this.cellSizeX) / 2;
+    this.borderY = (this.widthY - this.counterY * this.cellSizeY) / 2;
+  }
+  
+  public calculate(axis: boolean) {
+    const minimumCellSize = 2.8;
+
+    let width;
+    let count;
+    let border;
+    let cellSize;
+
+    if (axis) {
+      width = this.widthX;
+      count = this.counterX;
+      border = this.borderX;
+      cellSize = this.cellSizeX;
+    } else {
+      width = this.widthY;
+      count = this.counterY;
+      border = this.borderY;
+      cellSize = this.cellSizeY;
+    }
+
+    if (this.layerNumber % 2 == 1) {
+      if (count % 2 == 1) {
+        if (count == 1) {
+          if (border < 1) {
+            border = width;
+          } else {
+            count = 2;
+            border += cellSize / 2;
+          }
+        } else if (count = 3 && border < 1 && border >= 0.2) {
+          cellSize = minimumCellSize;
+          count = 4;
+          border = (width - count * minimumCellSize) / 2;
+
+          if (border != 0) {
+            border += minimumCellSize;
+          }
+        } else if (border < 1.8 && border >= 1) {
+          ++count;
+          border += 0.5 * cellSize;
+        } else {
+          ++count;
+          border += 0.5 * cellSize;
+        }
+      } else if (count == 0) {
+        count = 1;
+        border = 3.6
+      } else if (count == 2) {
+        border = width / 2;
+      } else if (border < 1.8 && border >= 1) {
+        border += cellSize;
+      } else {
+        --count;
+        border += 1.5 * cellSize;
+      }
+    } else if (count % 2 == 1) {
+      if (count == 1) {
+        if (border > 1) {
+          count = 2;
+          border += cellSize / 2;
+        } else {
+          border = width;
+        }
+      } else if (count > 2 && border != 0) {
+        border += cellSize;
+      }
+    } else if (count == 0) {
+      count = 1;
+      border = 3.6;
+    } else if (count == 2) {
+      if (border != 0) {
+        if (border < 1.8 && border > 1) {
+          ++count;
+          border += cellSize / 2;
+        } else if (border >= 0.6) {
+          cellSize = minimumCellSize;
+          count = 3;
+          border = (width - minimumCellSize) / 2;
+        } else {
+          border = width / 2;
+        }
+      }
+    } else if (count > 3) {
+      if (border != 0) {
+        if (border < 1.8 && border > 1) {
+          ++count;
+          border += 0.5 * cellSize;
+        } else {
+          --count;
+          border += 1.5 * cellSize;
+        }
+      } else {
+        --count;
+        border += 1.5 * cellSize;
+      }
+    }
+
+    console.log(width, count, border, cellSize);
+    
+
+    if (axis) {
+      this.counterX = count;
+      this.borderX = border;
+      this.cellSizeX = cellSize;
+    } else {
+      this.counterY = count;
+      this.borderY = border;
+      this.cellSizeY = cellSize;
+    }
+  }
+}
+
 const gCodeUtils = new GCodeUtils();
+const point = new Point(0, 0);
+const figure = new Figure();
 
-
+figure.checkHeader();
+figure.makePyramid();
 
 /*---------------------------------------------------*/
 function getParameters() {
